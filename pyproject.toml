@@ -11,7 +11,7 @@ license = "MIT"
 requires-python = ">=3.10"
 authors = [
   { name = "Joyita F." },
-  { name = "Benjamin Cummins" },
+  { name = "Benjamin R. Cummins" },
   { name = "George Glidden-Handgis" },
 ]
 dependencies = [

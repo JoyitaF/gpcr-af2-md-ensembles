@@ -10,7 +10,7 @@ authors:
     given-names: Joyita
     affiliation: "Computational Molecular Biology Group, Chulalongkorn University"
   - family-names: Cummins
-    given-names: Benjamin
+    given-names: Benjamin R.
   - family-names: Glidden-Handgis
     given-names: George
 preferred-citation:
@@ -20,7 +20,7 @@ preferred-citation:
     - family-names: Faruk
       given-names: Joyita
     - family-names: Cummins
-      given-names: Benjamin
+      given-names: Benjamin R.
     - family-names: Glidden-Handgis
       given-names: George
   journal: bioRxiv
