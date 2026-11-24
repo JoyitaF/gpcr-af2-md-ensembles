@@ -11,7 +11,7 @@ authors:
     affiliation: "Computational Molecular Biology Group, Chulalongkorn University"
   - family-names: Cummins
     given-names: Benjamin
-  - family-names: Glidden
+  - family-names: Glidden-Handgis
     given-names: George
 preferred-citation:
   type: article
@@ -21,7 +21,7 @@ preferred-citation:
       given-names: Joyita
     - family-names: Cummins
       given-names: Benjamin
-    - family-names: Glidden
+    - family-names: Glidden-Handgis
       given-names: George
   journal: bioRxiv
   year: 2026

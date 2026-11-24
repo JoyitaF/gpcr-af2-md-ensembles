@@ -6,5 +6,6 @@ configuration for each receptor and checks the file's SHA-256 before every run, 
 unreviewed edit cannot change the results silently. To change the numerics, edit the
 file, update `CORE_SHA256` in `cartesian.py`, and record the change in CHANGELOG.md.
 
-The code is the version used for the paper's analyses; this copy differs from it only in
-comments and docstrings (identical syntax tree otherwise).
+The code is the version used for the paper's analyses. This copy differs from it only in
+comments and in the removal of optional input types that the study did not use; every
+computation reported in the paper is unchanged.

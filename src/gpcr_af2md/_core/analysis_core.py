@@ -4,14 +4,13 @@
 #
 # Cartesian comparison of MD trajectories with AF2 MSA-depth ensembles.
 #
-# Two complementary analyses are applied to every source (all-atom MD,
-# AF2 MSA-depth ensembles; optional coarse-grained and external MD inputs):
+# Two complementary analyses are applied to MD and to every AF2 MSA-depth
+# ensemble:
 #
 #   PRIMARY — STATE IDENTIFICATION
 #       Pairwise Cα/BB distance matrix → StandardScaler → sklearn PCA
 #       → k-means clustering with elbow selection, free-energy surface,
 #       per-source cluster populations, PC1/PC2 scatter.
-#       Applied to all sources; CG uses BB beads (Cα equivalents).
 #
 #   SECONDARY — SUBSPACE COMPARISON
 #       Kabsch superposition → Cα-coordinate covariance PCA → RMSIP /
@@ -73,25 +72,6 @@ CONFIG = {
         "16:160":   "af2/16x160/*_unrelaxed_rank_*.pdb",
         "8:80":     "af2/8x80/*_unrelaxed_rank_*.pdb",
         "1:2":      "af2/single seq/*_unrelaxed_rank_*.pdb",
-    },
-
-    # Go-Martini CG
-    "cg": {
-        "topology":    "cg/cg.gro",
-        "trajectory":  "cg/cg.xtc",
-        "bb_selection": "name BB",
-        "resid_offset": -1,
-        "skip_ns": 0.0,
-        "stride":  1,
-    },
-
-    # optional backmapped coarse-grained trajectory (unused when None)
-    "cg_backmapped": {
-        "topology":   None,   # e.g. "cg/backmapped.gro"
-        "trajectory": None,   # e.g. "cg/backmapped.xtc"
-        "resid_offset": -1,
-        "skip_ns": 0.0,
-        "stride":  1,
     },
 
     # state identification (distance-PCA + k-means)
@@ -445,9 +425,6 @@ def build_common_set(inactive, active, md_top, af2_globs):
     for g in af2_globs:
         fs = sorted(glob.glob(g))
         if fs: sets.append(ca_resids_present(fs[0], CONFIG["af2_resid_offset"]))
-    cg = CONFIG["cg"]
-    if cg["topology"]:
-        sets.append(ca_resids_present(cg["topology"], cg["resid_offset"], atom_name="BB"))
     if not sets:
         raise SystemExit("Cannot define a common residue set -- give at least endpoints + MD.")
     common = sorted(set.intersection(*sets) - excl)
@@ -563,68 +540,12 @@ def analyze_af2_depths(args, common, md, endpoints):
     return rows, desc_bd, sproj_bd, coords_bd
 
 
-def validate_against_gpcrmd(args, common, md):
-    if not args.gpcrmd:
-        return None
-    print("\n=== validation: our MD vs GPCRmd ===")
-    from scipy.stats import ks_2samp
-    cfg = CONFIG
-    top, traj = args.gpcrmd
-    c = traj_ca(top, traj, common, 0, cfg["md_skip_ns"], cfg["md_stride"])
-    sup = superpose_to(c, md["ref"])
-    _, V_g, _ = pca_modes(sup, cfg["n_modes"])
-    rip    = rmsip(V_g, md["V"], cfg["n_modes"])
-    rmsf_g = rmsf_per_atom(c, md["ref"])
-    r      = float(np.corrcoef(rmsf_g, md["rmsf"])[0, 1])
-    dg     = descriptors(top, traj, md["ref"], common, 0, cfg["md_skip_ns"], cfg["md_stride"])
-    ks     = float(ks_2samp(md["descriptors"]["ionic_lock"], dg["ionic_lock"]).statistic)
-    print(f"  RMSIP(MD,GPCRmd)={rip:.3f}  RMSF corr={r:+.3f}  "
-          f"ionic-lock KS={ks:.3f} (smaller = more similar)")
-    return dict(RMSIP=rip, rmsf_corr=r, ionic_lock_KS=ks, descriptors=dg, pooled=c)
-
-
-def analyze_cg(args, common, md):
-    cg = CONFIG["cg"]
-    if not cg["topology"] or not cg["trajectory"]:
-        print("\n=== Martini CG: not configured ===")
-        return None
-    print("\n=== Martini CG vs MD ===")
-    coords = traj_ca(cg["topology"], cg["trajectory"], common,
-                     cg["resid_offset"], cg["skip_ns"], cg["stride"], atom_name="BB")
-    print(f"  {coords.shape[0]} frames, {coords.shape[1]} BB beads")
-    sup = superpose_to(coords, md["ref"])
-    _, V_cg, _ = pca_modes(sup, CONFIG["n_modes"])
-    rip  = rmsip(V_cg, md["V"], CONFIG["n_modes"])
-    co   = cumulative_overlap(md["V"], V_cg, CONFIG["n_modes"])
-    rmsf_cg = rmsf_per_atom(coords, md["ref"])
-    r    = float(np.corrcoef(rmsf_cg, md["rmsf"])[0, 1])
-    # TM3-TM6 BB-BB distance (CG-safe; no side-chain atoms at CG resolution)
-    il   = CONFIG["ionic_lock"]
-    import MDAnalysis as mda
-    u    = mda.Universe(cg["topology"], cg["trajectory"])
-    bb_p = u.select_atoms(f"name BB and resid {il['res_pos'] + cg['resid_offset']}")
-    bb_n = u.select_atoms(f"name BB and resid {il['res_neg'] + cg['resid_offset']}")
-    _check_resname(u, il["res_pos"] + cg["resid_offset"], il["res_pos_name"], "CG +")
-    _check_resname(u, il["res_neg"] + cg["resid_offset"], il["res_neg_name"], "CG −")
-    dt_ps  = float(getattr(u.trajectory, "dt", 0.0)) or 1.0
-    start  = int(round(cg["skip_ns"] * 1000.0 / dt_ps))
-    tm36_cg = [float(np.linalg.norm(bb_p.positions[0] - bb_n.positions[0]))
-               for ts in u.trajectory[start::cg["stride"]]]
-    tm36_cg = np.array(tm36_cg)
-    from scipy.stats import ks_2samp
-    ks = float(ks_2samp(md["descriptors"]["tm3_tm6_ca"], tm36_cg).statistic)
-    print(f"  RMSIP(CG,MD)={rip:.3f}  cum_overlap={co:.3f}  RMSF corr={r:+.3f}  "
-          f"TM3-TM6 BB KS={ks:.3f}")
-    return dict(RMSIP=rip, cum_overlap=co, rmsf_corr=r, tm36_ks=ks,
-                rmsf=rmsf_cg, V=V_cg, pooled=coords, tm3_tm6=tm36_cg)
-
-
-def analyze_conformational_states(common, md, gpcrmd, cg, coords_by_depth, endpoints):
+def analyze_conformational_states(common, md, coords_by_depth, endpoints):
     """
     Primary conformational analysis.
 
     Fits StandardScaler + PCA on the pairwise Cα distance matrix of the pooled
-    AA-MD trajectory, then projects every other source onto that space.
+    AA-MD trajectory, then projects the AF2 ensembles and endpoints onto that space.
     k-means clustering and FES are computed on the AA-MD projection.
     """
     print("\n=== Conformational states (distance-PCA + k-means) ===")
@@ -657,17 +578,6 @@ def analyze_conformational_states(common, md, gpcrmd, cg, coords_by_depth, endpo
         lbl = kmeans.predict(X[:, :3])
         return X, lbl, cluster_populations(lbl, k)
 
-    X_cg, labels_cg, pop_cg = _project_and_assign(cg["pooled"] if cg else None)
-    if cg:
-        print(f"  k={k} CG  populations: " +
-              "  ".join(f"C{i}={pop_cg[i]:.3f}" for i in range(k)))
-
-    X_gpcrmd, labels_gpcrmd, pop_gpcrmd = _project_and_assign(
-        gpcrmd["pooled"] if gpcrmd else None)
-    if gpcrmd:
-        print(f"  k={k} GPCRmd populations: " +
-              "  ".join(f"C{i}={pop_gpcrmd[i]:.3f}" for i in range(k)))
-
     X_af2, labels_af2, pop_af2 = {}, {}, {}
     for label, coords in coords_by_depth.items():
         X_af2[label], labels_af2[label], pop_af2[label] = _project_and_assign(coords)
@@ -682,8 +592,6 @@ def analyze_conformational_states(common, md, gpcrmd, cg, coords_by_depth, endpo
     return dict(
         scaler=scaler, pca=pca, kmeans=kmeans, k=k, var_ratio=var,
         X_md=X_md, labels_md=labels_md, pop_md=pop_md,
-        X_cg=X_cg, labels_cg=labels_cg, pop_cg=pop_cg,
-        X_gpcrmd=X_gpcrmd, labels_gpcrmd=labels_gpcrmd, pop_gpcrmd=pop_gpcrmd,
         X_af2=X_af2, labels_af2=labels_af2, pop_af2=pop_af2,
         X_ep=X_ep, inertias=inertias,
         F_md=F_md, fes_edges=(xe, ye),
@@ -694,9 +602,7 @@ def analyze_backbone_states(args, common, endpoints):
     """
     State identification on full backbone (N/CA/C/O) pairwise distances.
 
-    Uses the protein backbone as the feature space.
-    Applied to all-atom MD and AF2, and to optional external MD or backmapped
-    coarse-grained inputs when CONFIG provides them.
+    Uses the protein backbone as the feature space; applied to MD and AF2.
     """
     print("\n=== Backbone state identification (N/CA/C/O distance-PCA + k-means) ===")
     cfg = CONFIG
@@ -728,17 +634,6 @@ def analyze_backbone_states(args, common, endpoints):
     print(f"  k={k} MD populations: " +
           "  ".join(f"C{i}={pop_md[i]:.3f}" for i in range(k)))
 
-    # GPCRmd backbone
-    X_gpcrmd = labels_gpcrmd = pop_gpcrmd = None
-    if args.gpcrmd:
-        top_g, traj_g = args.gpcrmd
-        c_g = traj_backbone(top_g, traj_g, common, 0, cfg["md_skip_ns"], cfg["md_stride"])
-        X_gpcrmd = dist_pca_transform(dist_features(c_g), scaler, pca)
-        labels_gpcrmd = kmeans.predict(X_gpcrmd[:, :3])
-        pop_gpcrmd = cluster_populations(labels_gpcrmd, k)
-        print(f"  k={k} GPCRmd populations: " +
-              "  ".join(f"C{i}={pop_gpcrmd[i]:.3f}" for i in range(k)))
-
     # AF2 backbone (per MSA depth)
     X_af2, labels_af2, pop_af2 = {}, {}, {}
     for label, gpat in cfg["af2_ensembles"].items():
@@ -749,23 +644,6 @@ def analyze_backbone_states(args, common, endpoints):
             X_af2[label]      = X
             labels_af2[label] = lbl
             pop_af2[label]    = cluster_populations(lbl, k)
-
-    # optional backmapped coarse-grained backbone (skipped when not configured)
-    X_cg_bb = labels_cg_bb = pop_cg_bb = None
-    cg_bm = cfg.get("cg_backmapped", {})
-    if cg_bm.get("topology") and cg_bm.get("trajectory"):
-        print("  loading backmapped CG backbone ...")
-        c_bm = traj_backbone(cg_bm["topology"], cg_bm["trajectory"], common,
-                             cg_bm.get("resid_offset", 0),
-                             cg_bm.get("skip_ns", 0.0), cg_bm.get("stride", 1))
-        X_cg_bb      = dist_pca_transform(dist_features(c_bm), scaler, pca)
-        labels_cg_bb = kmeans.predict(X_cg_bb[:, :3])
-        pop_cg_bb    = cluster_populations(labels_cg_bb, k)
-        print(f"  k={k} backmapped CG populations: " +
-              "  ".join(f"C{i}={pop_cg_bb[i]:.3f}" for i in range(k)))
-    else:
-        print("  backmapped CG not yet configured "
-              "(set CONFIG['cg_backmapped'] when reconstruction is available)")
 
     # endpoint projections
     X_ep = {}
@@ -779,9 +657,7 @@ def analyze_backbone_states(args, common, endpoints):
     return dict(
         scaler=scaler, pca=pca, kmeans=kmeans, k=k, var_ratio=var,
         X_md=X_md, labels_md=labels_md, pop_md=pop_md,
-        X_gpcrmd=X_gpcrmd, labels_gpcrmd=labels_gpcrmd, pop_gpcrmd=pop_gpcrmd,
         X_af2=X_af2, labels_af2=labels_af2, pop_af2=pop_af2,
-        X_cg_bb=X_cg_bb, labels_cg_bb=labels_cg_bb, pop_cg_bb=pop_cg_bb,
         X_ep=X_ep, inertias=inertias,
         F_md=F_md, fes_edges=(xe, ye),
     )
@@ -792,9 +668,9 @@ def analyze_backbone_states(args, common, endpoints):
 # =============================================================================
 
 # shared colour / marker conventions
-_SRC_COLORS  = {"aa": "#2176AE", "cg": "#E07B39", "gpcrmd": "#3D9970"}
+_SRC_COLORS  = {"aa": "#2176AE"}
 _EP_COLORS   = {"inactive": "#C0392B", "active": "#F39C12"}
-_MK          = {"aa": "o", "cg": "^", "gpcrmd": "s", "af2": "D", "xtal": "*"}
+_MK          = {"aa": "o", "af2": "D", "xtal": "*"}
 
 
 def _af2_palette(labels):
@@ -877,26 +753,7 @@ def plot_conformational_states(out, states):
     plt.tight_layout()
     plt.savefig(os.path.join(out, "fig_state_fes_md.png"), dpi=150); plt.close()
 
-    # 4. FES comparison: MD vs CG (if available)
-    if states["X_cg"] is not None:
-        F_cg, xec, yec = free_energy_2d(states["X_cg"][:, 0], states["X_cg"][:, 1])
-        xcc = 0.5 * (xec[:-1] + xec[1:]); ycc = 0.5 * (yec[:-1] + yec[1:])
-        fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True, sharey=True)
-        for ax, Fmap, xcv, ycv, title in [
-                (axes[0], F,    xc,  yc,  "AA-MD"),
-                (axes[1], F_cg, xcc, ycc, "CG")]:
-            cf = ax.contourf(xcv, ycv, Fmap.T, levels=20, cmap="RdYlBu_r",
-                             vmin=0, vmax=max(F.max(), F_cg.max()))
-            plt.colorbar(cf, ax=ax, label="ΔF (kT)")
-            for name, x_ep in states["X_ep"].items():
-                ax.scatter(x_ep[0], x_ep[1], marker="*", s=250,
-                           color=_EP_COLORS.get(name, "#555"), edgecolor="k", zorder=5)
-            ax.set_xlabel("dist-PC1"); ax.set_ylabel("dist-PC2")
-            ax.set_title(f"FES: {title}")
-        plt.tight_layout()
-        plt.savefig(os.path.join(out, "fig_state_fes_comparison.png"), dpi=150); plt.close()
-
-    # 5. cluster-coloured scatter: MD + CG + GPCRmd + endpoints
+    # 4. cluster-coloured scatter: MD + endpoints
     fig, ax = plt.subplots(figsize=(8, 6))
     X_md = states["X_md"]
     for i in range(k):
@@ -904,35 +761,19 @@ def plot_conformational_states(out, states):
         ax.scatter(X_md[mask, 0], X_md[mask, 1], s=4, alpha=0.35,
                    color=CMAP[i], rasterized=True,
                    label=f"MD C{i} ({states['pop_md'][i]:.2f})")
-    if states["X_cg"] is not None:
-        for i in range(k):
-            mask = states["labels_cg"] == i
-            ax.scatter(states["X_cg"][mask, 0], states["X_cg"][mask, 1],
-                       s=8, marker="^", color=CMAP[i], alpha=0.6,
-                       edgecolors="k", linewidths=0.3, zorder=3)
-        ax.scatter([], [], marker="^", color="grey", s=30, label="CG (△)")
-    if states["X_gpcrmd"] is not None:
-        for i in range(k):
-            mask = states["labels_gpcrmd"] == i
-            ax.scatter(states["X_gpcrmd"][mask, 0], states["X_gpcrmd"][mask, 1],
-                       s=8, marker="s", color=CMAP[i], alpha=0.6,
-                       edgecolors="k", linewidths=0.3, zorder=3)
-        ax.scatter([], [], marker="s", color="grey", s=30, label="GPCRmd (□)")
     for name, x_ep in states["X_ep"].items():
         ax.scatter(x_ep[0], x_ep[1], marker="*", s=350,
                    color=_EP_COLORS.get(name, "#555"), edgecolor="k", zorder=5,
                    label=f"{name} (xtal)")
     ax.set_xlabel("dist-PC1"); ax.set_ylabel("dist-PC2")
-    ax.set_title(f"Conformational states (k={k}) — all sources\n"
-                 "○ AA-MD  △ CG  □ GPCRmd  ★ crystal  (colour = cluster)")
+    ax.set_title(f"Conformational states (k={k}) in MD\n"
+                 "○ MD  ★ crystal  (colour = cluster)")
     ax.legend(fontsize=7, ncol=2, markerscale=2)
     plt.tight_layout()
     plt.savefig(os.path.join(out, "fig_state_clusters.png"), dpi=150); plt.close()
 
-    # 6. cluster population bar chart: all sources side by side
+    # 5. cluster population bar chart: MD and each AF2 setting
     src_pops = {"MD": states["pop_md"]}
-    if states["pop_cg"]     is not None: src_pops["CG"]     = states["pop_cg"]
-    if states["pop_gpcrmd"] is not None: src_pops["GPCRmd"] = states["pop_gpcrmd"]
     for lbl, pop in states["pop_af2"].items():
         if pop is not None:
             src_pops[f"AF2\n{lbl}"] = pop
@@ -959,8 +800,6 @@ def plot_conformational_states(out, states):
     AF2_PAL = _af2_palette(_af2_labels_all)
     src_panels = [
         ("MD",     states["X_md"],     states["labels_md"],     states["pop_md"],     _SRC_COLORS["aa"]),
-        ("CG",     states["X_cg"],     states["labels_cg"],     states["pop_cg"],     _SRC_COLORS["cg"]),
-        ("GPCRmd", states["X_gpcrmd"], states["labels_gpcrmd"], states["pop_gpcrmd"], _SRC_COLORS["gpcrmd"]),
     ]
     for lbl in _af2_labels_all:
         src_panels.append((f"AF2 {lbl}",
@@ -975,8 +814,7 @@ def plot_conformational_states(out, states):
 
 def plot_backbone_states(out, states_bb):
     """Plots for the backbone (N/CA/C/O) state analysis.
-    Mirrors plot_conformational_states with bb-prefixed filenames.
-    CG backmapped panels activate automatically once the data is supplied."""
+    Mirrors plot_conformational_states with bb-prefixed filenames."""
     k = states_bb["k"]
     CMAP = plt.cm.tab10.colors[:k]
 
@@ -1015,27 +853,7 @@ def plot_backbone_states(out, states_bb):
     plt.tight_layout()
     plt.savefig(os.path.join(out, "fig_bb_state_fes_md.png"), dpi=150); plt.close()
 
-    # 4. FES comparison vs backmapped CG (activates when cg_backmapped is configured)
-    if states_bb["X_cg_bb"] is not None:
-        F_cg, xec, yec = free_energy_2d(states_bb["X_cg_bb"][:, 0],
-                                         states_bb["X_cg_bb"][:, 1])
-        xcc = 0.5 * (xec[:-1] + xec[1:]); ycc = 0.5 * (yec[:-1] + yec[1:])
-        vmax = max(F.max(), F_cg.max())
-        fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True, sharey=True)
-        for ax, Fmap, xcv, ycv, title in [
-                (axes[0], F,    xc,  yc,  "AA-MD"),
-                (axes[1], F_cg, xcc, ycc, "CG backmapped")]:
-            cf = ax.contourf(xcv, ycv, Fmap.T, levels=20, cmap="RdYlBu_r",
-                             vmin=0, vmax=vmax)
-            plt.colorbar(cf, ax=ax, label="ΔF (kT)")
-            for name, x_ep in states_bb["X_ep"].items():
-                ax.scatter(x_ep[0], x_ep[1], marker="*", s=250,
-                           color=_EP_COLORS.get(name, "#555"), edgecolor="k", zorder=5)
-            ax.set_xlabel("bb-PC1"); ax.set_ylabel("bb-PC2"); ax.set_title(f"FES: {title}")
-        plt.tight_layout()
-        plt.savefig(os.path.join(out, "fig_bb_state_fes_comparison.png"), dpi=150); plt.close()
-
-    # 5. cluster-coloured scatter: MD + GPCRmd + backmapped CG + endpoints
+    # 4. cluster-coloured scatter: MD + endpoints
     fig, ax = plt.subplots(figsize=(8, 6))
     X_md = states_bb["X_md"]
     for i in range(k):
@@ -1043,36 +861,18 @@ def plot_backbone_states(out, states_bb):
         ax.scatter(X_md[mask, 0], X_md[mask, 1], s=4, alpha=0.35,
                    color=CMAP[i], rasterized=True,
                    label=f"MD C{i} ({states_bb['pop_md'][i]:.2f})")
-    if states_bb["X_gpcrmd"] is not None:
-        for i in range(k):
-            mask = states_bb["labels_gpcrmd"] == i
-            ax.scatter(states_bb["X_gpcrmd"][mask, 0], states_bb["X_gpcrmd"][mask, 1],
-                       s=8, marker="s", color=CMAP[i], alpha=0.6,
-                       edgecolors="k", linewidths=0.3, zorder=3)
-        ax.scatter([], [], marker="s", color="grey", s=30, label="GPCRmd (□)")
-    if states_bb["X_cg_bb"] is not None:
-        for i in range(k):
-            mask = states_bb["labels_cg_bb"] == i
-            ax.scatter(states_bb["X_cg_bb"][mask, 0], states_bb["X_cg_bb"][mask, 1],
-                       s=8, marker="^", color=CMAP[i], alpha=0.6,
-                       edgecolors="k", linewidths=0.3, zorder=3)
-        ax.scatter([], [], marker="^", color="grey", s=30, label="CG backmapped (△)")
     for name, x_ep in states_bb["X_ep"].items():
         ax.scatter(x_ep[0], x_ep[1], marker="*", s=350,
                    color=_EP_COLORS.get(name, "#555"), edgecolor="k", zorder=5,
                    label=f"{name} (xtal)")
     ax.set_xlabel("bb-PC1"); ax.set_ylabel("bb-PC2")
-    ax.set_title(f"Backbone conformational states (k={k})\n"
-                 "○ AA-MD  □ GPCRmd  △ CG backmapped  ★ crystal  (colour = cluster)")
+    ax.set_title(f"Backbone conformational states (k={k}) in MD\n"
+                 "○ MD  ★ crystal  (colour = cluster)")
     ax.legend(fontsize=7, ncol=2, markerscale=2); plt.tight_layout()
     plt.savefig(os.path.join(out, "fig_bb_state_clusters.png"), dpi=150); plt.close()
 
-    # 6. population bar chart: all sources
+    # 5. population bar chart: MD and each AF2 setting
     src_pops = {"MD": states_bb["pop_md"]}
-    if states_bb["pop_gpcrmd"] is not None:
-        src_pops["GPCRmd"] = states_bb["pop_gpcrmd"]
-    if states_bb["pop_cg_bb"] is not None:
-        src_pops["CG\n(backmapped)"] = states_bb["pop_cg_bb"]
     for lbl, pop in states_bb["pop_af2"].items():
         if pop is not None:
             src_pops[f"AF2\n{lbl}"] = pop
@@ -1097,8 +897,6 @@ def plot_backbone_states(out, states_bb):
     AF2_PAL = _af2_palette(_af2_labels_all)
     src_panels = [
         ("MD",            states_bb["X_md"],     states_bb["labels_md"],     states_bb["pop_md"],     _SRC_COLORS["aa"]),
-        ("GPCRmd",        states_bb["X_gpcrmd"], states_bb["labels_gpcrmd"], states_bb["pop_gpcrmd"], _SRC_COLORS["gpcrmd"]),
-        ("CG_backmapped", states_bb["X_cg_bb"],  states_bb["labels_cg_bb"],  states_bb["pop_cg_bb"],  _SRC_COLORS["cg"]),
     ]
     for lbl in _af2_labels_all:
         src_panels.append((f"AF2 {lbl}",
@@ -1111,8 +909,7 @@ def plot_backbone_states(out, states_bb):
     print(f"[backbone state figures] written to {out}/")
 
 
-def plot_subspace(out, common, md, af2_rows, desc_bd, sproj_bd, endpoints,
-                  gpcrmd, cg=None):
+def plot_subspace(out, common, md, af2_rows, desc_bd, sproj_bd, endpoints):
     """Secondary subspace-comparison plots (RMSF, depth vs fidelity, descriptors,
     PC1/PC2 projected onto Cα-covariance subspace)."""
     resids = sorted(common)
@@ -1122,8 +919,6 @@ def plot_subspace(out, common, md, af2_rows, desc_bd, sproj_bd, endpoints,
     # 1. RMSF profile
     plt.figure(figsize=(10, 4))
     plt.plot(resids, md["rmsf"], lw=2, color=_SRC_COLORS["aa"], label="AA-MD")
-    if cg:
-        plt.plot(resids, cg["rmsf"], lw=1.5, ls="--", color=_SRC_COLORS["cg"], label="CG")
     plt.xlabel("residue (crystal numbering)"); plt.ylabel("Cα RMSF (Å)")
     plt.title("Per-residue flexibility"); plt.legend(); plt.tight_layout()
     plt.savefig(os.path.join(out, "fig_rmsf_profile.png"), dpi=150); plt.close()
@@ -1156,7 +951,7 @@ def plot_subspace(out, common, md, af2_rows, desc_bd, sproj_bd, endpoints,
         plt.title("Endpoint coverage vs MSA depth"); plt.legend(); plt.tight_layout()
         plt.savefig(os.path.join(out, "fig_endpoint_coverage.png"), dpi=150); plt.close()
 
-    # 3. Cα-subspace PC1/PC2 projection (all sources)
+    # 3. Cα-subspace PC1/PC2 projection (MD, AF2 and endpoints)
     def _traj_scatter(ax, coords_2d, src, label, s=5, alpha=0.3):
         ax.scatter(coords_2d[:, 0], coords_2d[:, 1], color=_SRC_COLORS[src],
                    marker=_MK[src], s=s, alpha=alpha, rasterized=True, zorder=2, linewidths=0)
@@ -1176,12 +971,6 @@ def plot_subspace(out, common, md, af2_rows, desc_bd, sproj_bd, endpoints,
     fig, ax = plt.subplots(figsize=(9, 7))
     pmd = subspace_project(md["pooled"], md["mean"], md["V"], 2, md["ref"])
     _traj_scatter(ax, pmd, "aa", "AA-MD  ○")
-    if gpcrmd and "pooled" in gpcrmd:
-        pg = subspace_project(gpcrmd["pooled"], md["mean"], md["V"], 2, md["ref"])
-        _traj_scatter(ax, pg, "gpcrmd", "GPCRmd  □")
-    if cg and "pooled" in cg:
-        pcg = subspace_project(cg["pooled"], md["mean"], md["V"], 2, md["ref"])
-        _traj_scatter(ax, pcg, "cg", "CG  △", s=4, alpha=0.2)
     af2_pts = []
     for label, p in sproj_bd.items():
         ax.scatter(p[:, 0], p[:, 1], marker=_MK["af2"], s=30, alpha=0.85,
@@ -1197,7 +986,7 @@ def plot_subspace(out, common, md, af2_rows, desc_bd, sproj_bd, endpoints,
         ep_pts.append(pe)
     ax.set_xlabel("MD PC1"); ax.set_ylabel("MD PC2")
     ax.set_title("All ensembles projected onto AA-MD essential plane\n"
-                 "○ AA-MD  △ CG  □ GPCRmd  ◇ AF2  ★ crystal")
+                 "○ AA-MD  ◇ AF2  ★ crystal")
     ax.legend(fontsize=7, loc="best", ncol=2); plt.tight_layout()
     plt.savefig(os.path.join(out, "fig_subspace_projection.png"), dpi=150)
     _zoom_save(ax, ep_pts, af2_pts, os.path.join(out, "fig_subspace_projection_zoom.png"))
@@ -1211,16 +1000,6 @@ def plot_subspace(out, common, md, af2_rows, desc_bd, sproj_bd, endpoints,
         md_vals = md_vals[~np.isnan(md_vals)]
         if len(md_vals):
             ax.hist(md_vals, bins=40, density=True, alpha=0.5, label="MD")
-        if gpcrmd:
-            g_vals = gpcrmd["descriptors"][key]
-            g_vals = g_vals[~np.isnan(g_vals)]
-            if len(g_vals):
-                ax.hist(g_vals, bins=40, density=True, histtype="step", lw=2, label="GPCRmd")
-        if cg and key == "tm3_tm6_ca":
-            cg_vals = cg["tm3_tm6"][~np.isnan(cg["tm3_tm6"])]
-            if len(cg_vals):
-                ax.hist(cg_vals, bins=40, density=True,
-                        histtype="step", lw=2, ls="dashed", label="CG")
         for lbl, d in desc_bd.items():
             vals = d[key][~np.isnan(d[key])]
             if len(vals):
@@ -1277,27 +1056,6 @@ def plot_icl_pca(out, args, icl_lo=202, icl_hi=225):
         if coords.shape[0] >= 2:
             icl_proj_bd[label] = subspace_project(coords, mean_icl, V_icl, 2, ref_icl)
 
-    pgpcrmd_icl = gpcr_icl_coords = None
-    if args.gpcrmd:
-        top_g, traj_g = args.gpcrmd
-        gpcr_icl_coords = traj_ca(top_g, traj_g, icl_resids, 0,
-                                   cfg["md_skip_ns"], cfg["md_stride"])
-        pgpcrmd_icl = subspace_project(gpcr_icl_coords, mean_icl, V_icl, 2, ref_icl)
-        print(f"  GPCRmd ICL: {gpcr_icl_coords.shape[0]} frames")
-
-    cg_cfg = cfg["cg"]
-    pcg_icl = cg_icl_coords = None
-    if cg_cfg["topology"] and cg_cfg["trajectory"]:
-        cg_icl_resids = sorted(
-            r for r in ca_resids_present(cg_cfg["topology"], cg_cfg["resid_offset"], "BB")
-            if icl_lo <= r <= icl_hi)
-        if len(cg_icl_resids) >= 3:
-            cg_icl_coords = traj_ca(cg_cfg["topology"], cg_cfg["trajectory"],
-                                    cg_icl_resids, cg_cfg["resid_offset"],
-                                    cg_cfg["skip_ns"], cg_cfg["stride"], atom_name="BB")
-            pcg_icl = subspace_project(cg_icl_coords, mean_icl, V_icl, 2, ref_icl)
-            print(f"  CG ICL: {cg_icl_coords.shape[0]} frames")
-
     icl_ep = {}
     if args.inactive:
         icl_ep["inactive"], _ = structure_ca(args.inactive, icl_resids, cfg["xtal_resid_offset"])
@@ -1330,22 +1088,11 @@ def plot_icl_pca(out, args, icl_lo=202, icl_hi=225):
                    s=s, alpha=alpha, zorder=zorder, rasterized=True, linewidths=0)
         ax.scatter([], [], color=_SRC_COLORS[src], marker=_MK[src], s=40, label=label)
 
-    def _add_extra_sources(ax, ci=(0, 1)):
-        i, j = ci
-        kk = max(ci) + 1
-        if pcg_icl is not None:
-            d = subspace_project(cg_icl_coords, mean_icl, V_icl, kk, ref_icl)
-            _src_scatter(ax, d[:, i], d[:, j], "cg", "CG  △", s=5, alpha=0.25, zorder=2)
-        if pgpcrmd_icl is not None:
-            d = subspace_project(gpcr_icl_coords, mean_icl, V_icl, kk, ref_icl)
-            _src_scatter(ax, d[:, i], d[:, j], "gpcrmd", "GPCRmd  □", s=5, alpha=0.25, zorder=2)
-
-    subtitle = "○ AA-MD  △ CG  □ GPCRmd  ◇ AF2  ★ crystal"
+    subtitle = "○ AA-MD  ◇ AF2  ★ crystal"
 
     # PC1 vs PC2
     fig, ax = plt.subplots(figsize=(9, 6))
     _src_scatter(ax, pmd[:, 0], pmd[:, 1], "aa", "AA-MD  ○")
-    _add_extra_sources(ax, ci=(0, 1))
     af2_pts12 = []
     for label, p in icl_proj_bd.items():
         ax.scatter(p[:, 0], p[:, 1], marker=_MK["af2"], s=45, alpha=0.9,
@@ -1372,7 +1119,6 @@ def plot_icl_pca(out, args, icl_lo=202, icl_hi=225):
         pmd3 = subspace_project(pooled_icl, mean_icl, V_icl, 3, ref_icl)
         fig, ax = plt.subplots(figsize=(9, 6))
         _src_scatter(ax, pmd3[:, 0], pmd3[:, 2], "aa", "AA-MD  ○")
-        _add_extra_sources(ax, ci=(0, 2))
         af2_pts13 = []
         for label, gpat in cfg["af2_ensembles"].items():
             coords_tmp, _ = ensemble_ca(gpat, icl_resids, cfg["af2_resid_offset"])
@@ -1404,12 +1150,6 @@ def plot_icl_pca(out, args, icl_lo=202, icl_hi=225):
                               (axes[1], 1, f"ICL PC2 ({var_frac[1]:.1f}%)")]:
         axi.plot(np.linspace(0, 1, len(pmd)), pmd[:, col],
                  lw=0.5, alpha=0.8, color=_SRC_COLORS["aa"], label="AA-MD")
-        if pgpcrmd_icl is not None:
-            axi.plot(np.linspace(0, 1, len(pgpcrmd_icl)), pgpcrmd_icl[:, col],
-                     lw=0.5, alpha=0.6, color=_SRC_COLORS["gpcrmd"], label="GPCRmd")
-        if pcg_icl is not None:
-            axi.plot(np.linspace(0, 1, len(pcg_icl)), pcg_icl[:, col],
-                     lw=0.4, alpha=0.5, color=_SRC_COLORS["cg"], label="CG")
         for name, eca_icl in icl_ep.items():
             pe = subspace_project(kabsch(eca_icl, ref_icl)[None], mean_icl, V_icl, 2, ref_icl)[0]
             axi.axhline(pe[col], ls="--", lw=1.2,
@@ -1424,10 +1164,6 @@ def plot_icl_pca(out, args, icl_lo=202, icl_hi=225):
     # per-residue RMSF bar chart
     rmsf_icl = rmsf_per_atom(pooled_icl, ref_icl)
     sources_rmsf = [("AA-MD", rmsf_icl, "steelblue")]
-    if pgpcrmd_icl is not None:
-        sources_rmsf.append(("GPCRmd", rmsf_per_atom(gpcr_icl_coords, ref_icl), "coral"))
-    if pcg_icl is not None:
-        sources_rmsf.append(("CG", rmsf_per_atom(cg_icl_coords, ref_icl), "darkcyan"))
     n = len(icl_resids)
     w = 0.8 / len(sources_rmsf)
     x = np.arange(n)
@@ -1474,8 +1210,6 @@ def main():
                     required=True, help="MD replica (repeat for multiple replicas)")
     ap.add_argument("--inactive", help="inactive endpoint PDB")
     ap.add_argument("--active",   help="active endpoint PDB")
-    ap.add_argument("--gpcrmd",   nargs=2, metavar=("TOP", "TRAJ"),
-                    help="GPCRmd topology + trajectory")
     ap.add_argument("--out",      default="results")
     ap.add_argument("--recompute", action="store_true",
                     help="ignore existing cache and rerun all computation")
@@ -1493,8 +1227,6 @@ def main():
         sproj_bd      = payload["sproj_bd"]
         coords_bd     = payload["coords_bd"]
         endpoints     = payload["endpoints"]
-        gpcrmd        = payload["gpcrmd"]
-        cg            = payload["cg"]
         states        = payload["states"]
         states_bb     = payload["states_bb"]
         summary       = payload["summary"]
@@ -1522,10 +1254,8 @@ def main():
 
         md                            = analyze_md_reference(args, common, ref)
         af2_rows, desc_bd, sproj_bd, coords_bd = analyze_af2_depths(args, common, md, endpoints)
-        gpcrmd                        = validate_against_gpcrmd(args, common, md)
-        cg                            = analyze_cg(args, common, md)
         states                        = analyze_conformational_states(
-                                            common, md, gpcrmd, cg, coords_bd, endpoints)
+                                            common, md, coords_bd, endpoints)
         states_bb                     = analyze_backbone_states(args, common, endpoints)
 
         write_csv(os.path.join(args.out, "metrics_by_depth.csv"), af2_rows)
@@ -1533,17 +1263,11 @@ def main():
             n_common_residues=len(common),
             n_clusters=states["k"],
             ca_md_cluster_populations=states["pop_md"].tolist(),
-            ca_cg_cluster_populations=(states["pop_cg"].tolist()
-                                       if states["pop_cg"] is not None else None),
             bb_md_cluster_populations=states_bb["pop_md"].tolist(),
-            bb_cg_cluster_populations=(states_bb["pop_cg_bb"].tolist()
-                                       if states_bb["pop_cg_bb"] is not None else None),
             md_anm_baseline=md["anm_baseline"],
             md_pc1_cosine_mean=float(np.mean(md["pc1_cosine"])),
             md_inter_replica_rmsip=(float(np.mean(md["inter_replica"]))
                                     if md["inter_replica"] else None),
-            gpcrmd=gpcrmd and {k: gpcrmd[k] for k in ("RMSIP", "rmsf_corr", "ionic_lock_KS")},
-            cg=cg and {k: cg[k] for k in ("RMSIP", "cum_overlap", "rmsf_corr", "tm36_ks")},
         )
         with open(os.path.join(args.out, "summary.json"), "w") as fh:
             json.dump(summary, fh, indent=2)
@@ -1551,13 +1275,13 @@ def main():
         save_cache(cache_path, dict(
             common=common, md=md, af2_rows=af2_rows,
             desc_bd=desc_bd, sproj_bd=sproj_bd, coords_bd=coords_bd,
-            endpoints=endpoints, gpcrmd=gpcrmd, cg=cg,
+            endpoints=endpoints,
             states=states, states_bb=states_bb, summary=summary,
         ))
 
     plot_conformational_states(args.out, states)
     plot_backbone_states(args.out, states_bb)
-    plot_subspace(args.out, common, md, af2_rows, desc_bd, sproj_bd, endpoints, gpcrmd, cg)
+    plot_subspace(args.out, common, md, af2_rows, desc_bd, sproj_bd, endpoints)
     plot_icl_pca(args.out, args)
 
     print("\n=== summary ===")

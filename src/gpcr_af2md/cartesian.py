@@ -20,7 +20,7 @@ from .prepare import AA3, prepared_inputs
 from .provenance import environment_record
 
 CORE_DIR = Path(__file__).resolve().parent / "_core"
-CORE_SHA256 = {"analysis_core.py": "40338325e227fda2be77cd7177c204b1f4ea220a0415110c826c09fcaefa333b"}
+CORE_SHA256 = {"analysis_core.py": "bcdfb20530928c6f5e8b318b95864b775b5b7c5830d5655ae014c2970911cb94"}
 BACKBONE = frozenset(("N", "CA", "C", "O"))
 
 
@@ -56,9 +56,6 @@ def configure_core(core, cfg: dict, patterns: dict[str, str], skip_ns: float, st
     core.CONFIG["npxxy"] = dict(cfg["npxxy"])
     core.CONFIG["contact_label"] = cfg.get("contact_label", "TM3-TM6 ionic lock (A)")
     core.CONFIG["af2_ensembles"] = dict(patterns)
-    for key in ("cg", "cg_backmapped"):  # no coarse-grained inputs in this study
-        core.CONFIG[key]["topology"] = None
-        core.CONFIG[key]["trajectory"] = None
     # The dedicated ICL3 PCA uses this receptor's loop range.
     lo, hi = map(int, cfg["icl3_range"])
     if not getattr(core, "_icl_wrapped", False):

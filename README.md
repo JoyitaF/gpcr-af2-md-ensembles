@@ -3,7 +3,7 @@
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/joyitaf/gpcr-af2-md-ensembles/blob/main/notebooks/gpcr_af2_md_reproducibility_test.ipynb)
 [![tests](https://github.com/joyitaf/gpcr-af2-md-ensembles/actions/workflows/tests.yml/badge.svg)](https://github.com/joyitaf/gpcr-af2-md-ensembles/actions/workflows/tests.yml)
 
-Code for *AlphaFold2 Recovers Selected Motion Features but Misses Conformational Distributions in Five GPCRs* (Faruk, Cummins and Glidden, bioRxiv, 2026).
+Code for *AlphaFold2 Recovers Selected Motion Features but Misses Conformational Distributions in Five GPCRs* (Faruk, Cummins and Glidden-Handgis, bioRxiv, 2026).
 
 We predict AlphaFold2 (AF2) ensembles for five class A GPCRs (ADORA2A, ADRB2, CNR1, CHRM2, OPRD1) at eight MSA subsampling settings, 20 seeds x 5 models each, and compare them with apo molecular dynamics from [GPCRmd](https://www.gpcrmd.org). The comparison covers Cartesian motion (PCA subspace overlap, RMSF, an ANM baseline), conformational states (distance-PCA clustering, nearest-MD-frame distances, activation descriptors) and backbone torsion distributions (dihedral PCA with a Jensen-Shannon divergence calibrated against MD subsamples).
 

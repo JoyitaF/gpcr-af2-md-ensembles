@@ -12,7 +12,7 @@ requires-python = ">=3.10"
 authors = [
   { name = "Joyita F." },
   { name = "Benjamin Cummins" },
-  { name = "George Glidden" },
+  { name = "George Glidden-Handgis" },
 ]
 dependencies = [
   "numpy>=1.26",
