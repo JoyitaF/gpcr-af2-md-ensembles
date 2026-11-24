@@ -57,6 +57,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("cartesian", help="Cartesian PCA/RMSIP, RMSF, ANM, states, descriptors")
     _common(p)
     _subset(p)
+    p.add_argument("--skip-backbone-states", action="store_true",
+                   help="skip the N/CA/C/O distance-state analysis (not reported in the paper; "
+                        "needs about 16 GB of RAM per 2,500 frames)")
 
     p = sub.add_parser("run", help="fetch, prepare, cartesian, dpca, states, bootstrap, summarize (AF2 models must exist)")
     _common(p)
@@ -114,7 +117,8 @@ def main(argv: list[str] | None = None) -> int:
             prepare(settings, layout, r, mode)
         if "cartesian" in stages:
             from . import cartesian
-            cartesian.run(settings, layout, r, mode, labels=labels, models_per_depth=per_depth)
+            cartesian.run(settings, layout, r, mode, labels=labels, models_per_depth=per_depth,
+                          backbone_states=not getattr(args, "skip_backbone_states", False))
         if "dpca" in stages:
             run_dpca(settings, layout, r, mode, getattr(args, "depths", None), per_depth)
         if "states" in stages:

@@ -12,6 +12,8 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+import numpy as np
+
 from .config import Layout, Settings, depth_dirname, file_sha256
 from .download import read_fasta
 from .prepare import AA3, prepared_inputs
@@ -123,7 +125,8 @@ def inspect_af2_pdb(path: Path, required: set[int], seq: str) -> None:
 
 
 def run(settings: Settings, layout: Layout, receptor: str, mode: str, *,
-        labels: list[str] | None = None, models_per_depth: int | None = None) -> Path:
+        labels: list[str] | None = None, models_per_depth: int | None = None,
+        backbone_states: bool = True) -> Path:
     core = load_core()
     labels = labels or settings.depth_labels
     if models_per_depth is None and labels == settings.depth_labels:
@@ -175,12 +178,18 @@ def run(settings: Settings, layout: Layout, receptor: str, mode: str, *,
     argv += ["--inactive", str(inactive), "--active", str(active), "--out", str(stage)]
     print(f"{receptor}: {len(trajectories)} replicate(s) x {md_meta['replicas'][0]['retained_frames']} frames; "
           f"skip {skip_ns} ns; AF2 {', '.join(f'{k}={len(v)}' for k, v in af2.items())}", flush=True)
-    saved_argv = sys.argv
+    saved = sys.argv, core.analyze_backbone_states, core.plot_backbone_states
+    if not backbone_states:
+        # The N/CA/C/O distance-state analysis is not used in the paper and needs far more
+        # memory than the C-alpha analyses; replace it with an empty result.
+        print(f"{receptor}: skipping backbone (N/CA/C/O) distance states", flush=True)
+        core.analyze_backbone_states = lambda *a, **k: {"pop_md": np.array([]), "pop_cg_bb": None}
+        core.plot_backbone_states = lambda *a, **k: None
     try:
         sys.argv = argv
         core.main()
     finally:
-        sys.argv = saved_argv
+        sys.argv, core.analyze_backbone_states, core.plot_backbone_states = saved
 
     (stage / "PROVENANCE.json").write_text(json.dumps({
         "receptor": receptor,
@@ -191,6 +200,7 @@ def run(settings: Settings, layout: Layout, receptor: str, mode: str, *,
         "frame_dt_ps": cfg["frame_dt_ps"], "skip_ns": skip_ns, "md_stride": settings.analysis["md"]["stride"],
         "cartesian_common_residues": sorted(common),
         "af2_models_per_setting": {k: len(v) for k, v in af2.items()},
+        "backbone_states": backbone_states,
         "endpoints_sha256": {p.name: file_sha256(p) for p in (inactive, active)},
         "analysis_core_sha256": CORE_SHA256,
         "config_sha256": {"receptors.yaml": settings.receptors_sha256, "analysis.yaml": settings.analysis_sha256},

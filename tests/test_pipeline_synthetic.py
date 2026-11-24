@@ -23,14 +23,19 @@ def test_full_pipeline(synthetic, mode):
     assert len(prov["replicas"]) == n_rep
     assert all(r["retained_frames"] == shortest for r in prov["replicas"])
 
-    assert _run(info, "cartesian", mode, *subset) == 0
+    # The public mode mirrors the Colab test, which skips the memory-heavy backbone states.
+    skip_bb = ["--skip-backbone-states"] if mode == "public" else []
+    assert _run(info, "cartesian", mode, *subset, *skip_bb) == 0
     cart = info["results"] / mode / "cartesian" / "TOY1"
     summary = json.loads((cart / "summary.json").read_text())
     pops = summary["ca_md_cluster_populations"]
     skip_frames = 125  # 25 ns at 200 ps/frame
     assert round(sum(pops) * n_rep * (shortest - skip_frames)) == n_rep * (shortest - skip_frames)
     assert (summary["md_inter_replica_rmsip"] is None) == (mode == "public")
-    assert json.loads((cart / "PROVENANCE.json").read_text())["skip_ns"] == 25.0
+    cart_prov = json.loads((cart / "PROVENANCE.json").read_text())
+    assert cart_prov["skip_ns"] == 25.0
+    assert cart_prov["backbone_states"] == (mode == "all")
+    assert (len(summary["bb_md_cluster_populations"]) > 0) == (mode == "all")
 
     assert _run(info, "dpca", mode) == 0
     d = info["results"] / mode / "dpca" / "TOY1"

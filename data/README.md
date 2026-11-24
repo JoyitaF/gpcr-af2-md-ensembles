@@ -9,5 +9,5 @@ or copied in by you, and is ignored by git:
 | `fasta/` | UniProt canonical sequences | `gpcr-af2md fetch` |
 | `raw/gpcrmd/<record>/` | GPCRmd files under their original names | `fetch` (public files) or you (account-only replicates) |
 | `prepared/<mode>/<R>/` | receptor-only topology and trajectories + provenance.json | `gpcr-af2md prepare` |
-| `msas/` | one .a3m per receptor | the authors' deposit, or `gpcr-af2md af2-msa` |
-| `af2/<R>/<caps>/seed_<n>/` | ColabFold ranked unrelaxed models | the authors' deposit, or the AF2 workflow |
+| `msas/` | one .a3m per receptor | Zenodo with the journal version (until then the authors, on request), or `gpcr-af2md af2-msa` |
+| `af2/<R>/<caps>/seed_<n>/` | ColabFold ranked unrelaxed models | Zenodo with the journal version (until then the authors, on request), or the AF2 workflow |
