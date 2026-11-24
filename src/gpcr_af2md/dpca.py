@@ -518,7 +518,7 @@ def run(*, receptor: str, top: Path, trajectories: list[Path], seq: str,
 
 
 def save_overlay_any(md_proj, projections, explained, out, receptor):
-    """Same overlay as `save_overlay` for a smaller set of MSA settings (smoke tests)."""
+    """Same overlay as `save_overlay` for a smaller set of MSA settings (quick test runs)."""
     n = len(projections)
     fig, axes = plt.subplots(1, n, figsize=(4 * n, 3.8), sharex=True, sharey=True,
                              constrained_layout=True, squeeze=False)

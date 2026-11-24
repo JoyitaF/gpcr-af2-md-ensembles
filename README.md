@@ -1,6 +1,6 @@
 # AF2 MSA-subsampling ensembles vs GPCRmd molecular dynamics
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/joyitaf/gpcr-af2-md-ensembles/blob/main/notebooks/smoke_test_colab.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/joyitaf/gpcr-af2-md-ensembles/blob/main/notebooks/gpcr_af2_md_reproducibility_test.ipynb)
 [![tests](https://github.com/joyitaf/gpcr-af2-md-ensembles/actions/workflows/tests.yml/badge.svg)](https://github.com/joyitaf/gpcr-af2-md-ensembles/actions/workflows/tests.yml)
 
 Code for *AlphaFold2 Recovers Selected Motion Features but Misses Conformational Distributions in Five GPCRs* (Faruk, Cummins and Glidden, bioRxiv, 2026).
@@ -13,14 +13,14 @@ We predict AlphaFold2 (AF2) ensembles for five class A GPCRs (ADORA2A, ADRB2, CN
 config/          receptors.yaml (GPCRmd file IDs, residue ranges), analysis.yaml (all settings)
 src/gpcr_af2md/  the package; _core/ holds the Cartesian analysis core (checksum-locked)
 data/endpoints/  experimental inactive/active structures, renumbered to UniProt positions
-notebooks/       smoke_test_colab.ipynb: one receptor, public data only
+notebooks/       gpcr_af2_md_reproducibility_test.ipynb: one receptor, public data only
 workflow/        Slurm scripts for the AF2 ladder (ColabFold 1.6.1) and the full analysis
 tests/           unit tests and an end-to-end test on synthetic data
 ```
 
 ## Quick start
 
-**In the browser.** Open the [Colab smoke test](https://colab.research.google.com/github/joyitaf/gpcr-af2-md-ensembles/blob/main/notebooks/smoke_test_colab.ipynb) and run all cells on a T4 GPU runtime. It runs the full pipeline on one receptor with public GPCRmd data and a small AF2 ensemble, and finishes with PASS/FAIL checks against values recorded for the paper.
+**In the browser.** Open the [Colab reproducibility test](https://colab.research.google.com/github/joyitaf/gpcr-af2-md-ensembles/blob/main/notebooks/gpcr_af2_md_reproducibility_test.ipynb) and run all cells on a T4 GPU runtime. It runs the full pipeline on one receptor with public GPCRmd data and a small AF2 ensemble, and finishes with PASS/FAIL checks against values recorded for the paper.
 
 **Locally** (Python 3.10 or newer, Linux or macOS):
 
@@ -67,7 +67,7 @@ Canonical sequences are fetched from UniProt (accessions in `config/receptors.ya
 
 ### AF2 ensembles
 
-Predictions used ColabFold 1.6.1 (`alphafold2_ptm`, 5 models, 3 recycles, dropout on, templates off) with `--max-msa` set to 512:5120, 256:2560, 128:1280, 64:640, 32:320, 16:160, 8:80 and 1:2, and seeds 1-20: 800 tasks and 4,000 models. The MSAs and all 4,000 models are being deposited on Zenodo, and the DOI will be listed here; place them under `data/msas/` and `data/af2/`. To regenerate: `gpcr-af2md af2-tasks` writes the task list and `workflow/af2/predict_array.sbatch` runs it. A new MSA from the ColabFold server can differ from ours because the server databases change, so use the deposited MSAs to reproduce the paper.
+Predictions used ColabFold 1.6.1 (`alphafold2_ptm`, 5 models, 3 recycles, dropout on, templates off) with `--max-msa` set to 512:5120, 256:2560, 128:1280, 64:640, 32:320, 16:160, 8:80 and 1:2, and seeds 1-20: 800 tasks and 4,000 models. The MSAs and all 4,000 models will be deposited on Zenodo with the journal version of the paper; until then they are available from the authors on request. To use them, place them under `data/msas/` and `data/af2/`. To regenerate: `gpcr-af2md af2-tasks` writes the task list and `workflow/af2/predict_array.sbatch` runs it. A new MSA from the ColabFold server can differ from ours because the server databases change, so use the paper's MSAs to reproduce its numbers.
 
 ## Reproduce the paper
 

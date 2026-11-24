@@ -2,7 +2,7 @@
 
 The paper's ensembles were run on a GPU cluster with the ColabFold 1.6.1 container
 (`workflow/af2/`). This module writes that task list and can run a subset of tasks
-with a local `colabfold_batch` (used by the Colab smoke test).
+with a local `colabfold_batch` (used by the Colab reproducibility test).
 
 Command per task (identical on the cluster):
     colabfold_batch <MSA.a3m> <out> --model-type alphafold2_ptm --num-models 5
@@ -41,7 +41,7 @@ def _colabfold() -> str:
 
 def make_msa(settings: Settings, layout: Layout, receptor: str) -> Path:
     """Query the ColabFold MMseqs2 server once per receptor. Server databases change over
-    time, so a new MSA can differ from the paper's; use the deposited .a3m to match the paper."""
+    time, so a new MSA can differ from the paper's; use the paper's .a3m to match its results."""
     target = layout.msa(receptor)
     if target.is_file():
         return target
@@ -61,7 +61,7 @@ def predict(settings: Settings, layout: Layout, receptor: str, labels: list[str]
     af = settings.analysis["af2"]
     msa = layout.msa(receptor)
     if not msa.is_file():
-        raise FileNotFoundError(f"{msa}: run `gpcr-af2md af2-msa` or copy the deposited MSA")
+        raise FileNotFoundError(f"{msa}: run `gpcr-af2md af2-msa` or copy in the paper's MSA")
     for label in labels:
         max_seq, max_extra = af["depths"][label]
         for seed in seeds:
