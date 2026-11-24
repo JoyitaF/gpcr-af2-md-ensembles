@@ -1,0 +1,17 @@
+# Large or third-party data: never committed
+data/raw/
+data/prepared/
+data/af2/
+data/msas/
+data/fasta/
+results/
+*.xtc
+*.trr
+*.dcd
+# Python
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+# Notebooks
+.ipynb_checkpoints/

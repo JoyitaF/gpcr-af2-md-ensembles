@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it and the preprint below."
+title: "gpcr-af2md: AF2 MSA-subsampling ensembles vs GPCRmd molecular dynamics"
+version: 0.1.0
+date-released: 2026-11-24
+license: MIT
+repository-code: "https://github.com/joyitaf/gpcr-af2-md-ensembles"
+authors:
+  - family-names: Faruk
+    given-names: Joyita
+    affiliation: "Computational Molecular Biology Group, Chulalongkorn University"
+  - family-names: Cummins
+    given-names: Benjamin
+  - family-names: Glidden
+    given-names: George
+preferred-citation:
+  type: article
+  title: "AlphaFold2 Recovers Selected Motion Features but Misses Conformational Distributions in Five GPCRs"
+  authors:
+    - family-names: Faruk
+      given-names: Joyita
+    - family-names: Cummins
+      given-names: Benjamin
+    - family-names: Glidden
+      given-names: George
+  journal: bioRxiv
+  year: 2026

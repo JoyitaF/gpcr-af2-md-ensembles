@@ -1,0 +1,183 @@
+# Receptor panel: one entry per GPCR.
+#
+# All residue numbers are canonical UniProt positions (1-based).
+# All MD comes from GPCRmd (https://www.gpcrmd.org). Each record has three
+# 500-ns replicates. Replicate 1 and the topology files download without an
+# account. Replicates 2 and 3 need a GPCRmd account; see README "Data".
+#
+# File URLs follow https://www.gpcrmd.org/dynadb/files/Dynamics/<file_id>_<kind>_<record>.<ext>
+# `sha256: null` means the checksum has not been recorded yet. Run
+# `gpcr-af2md checksums` on a machine that holds the files and paste the values here.
+
+ADORA2A:
+  name: Adenosine A2A receptor
+  uniprot: P29274
+  sequence_length: 412
+  gpcrmd:
+    record: 49
+    start_pdb: 5IU4
+    start_state: inactive
+    topology: {file_id: 10509, filename: 10509_dyn_49.psf, sha256: null}
+    model: {file_id: 10510, filename: 10510_dyn_49.pdb, sha256: null}
+    replicates:
+      - {file_id: 10504, filename: 10504_trj_49.xtc, access: public, sha256: null}
+      - {file_id: 10505, filename: 10505_trj_49.xtc, access: account, sha256: null}
+      - {file_id: 10506, filename: 10506_trj_49.xtc, access: account, sha256: null}
+    receptor_segments: auto
+  endpoints: {inactive: 4EIY, active: 5G53}
+  analysis_keep_range: [2, 307]
+  icl3_range: [199, 234]
+  ionic_lock:
+    res_pos: 102
+    res_pos_name: ARG
+    res_neg: 228
+    res_neg_name: GLU
+    pos_atoms: [NH1, NH2, NE]
+    neg_atoms: [OE1, OE2]
+  npxxy: {resid: 288, resname: TYR}
+  contact_label: "TM3-TM6 ionic lock R102-E228 (Å)"
+
+ADRB2:
+  name: Beta-2 adrenergic receptor
+  uniprot: P07550
+  sequence_length: 413
+  gpcrmd:
+    record: 11
+    start_pdb: 2RH1
+    start_state: inactive
+    topology: {file_id: 10188, filename: 10188_dyn_11.psf, sha256: null}
+    model: {file_id: 10189, filename: 10189_dyn_11.pdb, sha256: null}
+    replicates:
+      - {file_id: 10185, filename: 10185_trj_11.xtc, access: public, sha256: null}
+      - {file_id: 10186, filename: 10186_trj_11.xtc, access: account, sha256: null}
+      - {file_id: 10187, filename: 10187_trj_11.xtc, access: account, sha256: null}
+    receptor_segments: auto
+  endpoints: {inactive: 2RH1, active: 3P0G}
+  analysis_keep_range: [30, 339]
+  icl3_range: [221, 274]
+  ionic_lock:
+    res_pos: 131
+    res_pos_name: ARG
+    res_neg: 268
+    res_neg_name: GLU
+    pos_atoms: [NH1, NH2, NE]
+    neg_atoms: [OE1, OE2]
+  npxxy: {resid: 326, resname: TYR}
+  contact_label: "TM3-TM6 ionic lock R131-E268 (Å)"
+
+CNR1:
+  name: Cannabinoid receptor 1
+  uniprot: P21554
+  sequence_length: 472
+  gpcrmd:
+    record: 163
+    start_pdb: 5U09
+    start_state: inactive
+    topology: {file_id: 11521, filename: 11521_dyn_163.psf, sha256: null}
+    model: {file_id: 11520, filename: 11520_dyn_163.pdb, sha256: null}
+    replicates:
+      - {file_id: 11516, filename: 11516_trj_163.xtc, access: public, sha256: null}
+      - {file_id: 11517, filename: 11517_trj_163.xtc, access: account, sha256: null}
+      - {file_id: 11518, filename: 11518_trj_163.xtc, access: account, sha256: null}
+    receptor_segments: auto
+  endpoints: {inactive: 5U09, active: 5XRA}
+  analysis_keep_range: [110, 409]
+  icl3_range: [300, 344]
+  ionic_lock:
+    res_pos: 214
+    res_pos_name: ARG
+    res_neg: 338
+    res_neg_name: ASP
+    pos_atoms: [NH1, NH2, NE]
+    neg_atoms: [OD1, OD2]
+  npxxy: {resid: 397, resname: TYR}
+  contact_label: "TM3-TM6 ionic lock R214-D338 (Å)"
+
+CHRM2:
+  name: Muscarinic acetylcholine receptor M2
+  uniprot: P08172
+  sequence_length: 466
+  gpcrmd:
+    record: 72
+    start_pdb: 4MQT
+    start_state: active
+    topology:
+      file_id: 10710
+      filename: 10710_dyn_72.psf
+      sha256: 21f6b37c3bebe260ea26e57b41cc3cc61c78b91af1f839a49c1643bd20f5715f
+    model:
+      file_id: 10711
+      filename: 10711_dyn_72.pdb
+      sha256: 76b9ccef797a96dae3ddbe796f26768ee92e405f104298fbb61fda21e236dd46
+    replicates:
+      - file_id: 10705
+        filename: 10705_trj_72.xtc
+        access: public
+        sha256: 34f245e6b3286b2c3d52d5d3ce44646e9b7631b2ec9c42b32bd157e2fc3a7bc3
+      - file_id: 10706
+        filename: 10706_trj_72.xtc
+        access: account
+        sha256: d55ae24dd427059098cc66a3ad536974631286162655e68f2511a54b94bf7043
+      - file_id: 10707
+        filename: 10707_trj_72.xtc
+        access: account
+        sha256: 4636b583c5e194fda141038a4acc81313b03e92ea8d2048d0dca69992a4e0ade
+    # Audited segment IDs and the canonical residues they must contain.
+    receptor_segments: [P0, P1]
+    expected_residue_ranges: [[19, 228], [371, 456]]
+  endpoints: {inactive: 3UON, active: 4MQT}
+  analysis_keep_range: [19, 456]
+  icl3_range: [229, 370]
+  ionic_lock:
+    res_pos: 121
+    res_pos_name: ARG
+    res_neg: 382
+    res_neg_name: GLU
+    pos_atoms: [NH1, NH2, NE]
+    neg_atoms: [OE1, OE2]
+  npxxy: {resid: 440, resname: TYR}
+  contact_label: "TM3-TM6 ionic lock R121-E382 (Å)"
+
+OPRD1:
+  name: Delta-type opioid receptor
+  uniprot: P41143
+  sequence_length: 372
+  gpcrmd:
+    record: 73
+    start_pdb: 4N6H
+    start_state: inactive
+    topology:
+      file_id: 10718
+      filename: 10718_dyn_73.psf
+      sha256: 07e595dda1460dd8a23cd0171bd7cd8d174c2c7ff53e1c2b0c95c34ebaf94f65
+    model:
+      file_id: 10719
+      filename: 10719_dyn_73.pdb
+      sha256: d978ce5dca86e8628fd9ee2a9487f4e500bb074c281ee6464c78013ba84ab455
+    replicates:
+      - file_id: 10713
+        filename: 10713_trj_73.xtc
+        access: public
+        sha256: 4c82ae81b066faa8a4912c35608ae93ecb2d98bf2048b528c536a2ae4ea8fdac
+      - file_id: 10714
+        filename: 10714_trj_73.xtc
+        access: account
+        sha256: 9c10e295c7e922fe8e1bf8ca3d3a1324f918aeeeba8164b6e047304071306217
+      - file_id: 10715
+        filename: 10715_trj_73.xtc
+        access: account
+        sha256: 03e8c1487ae547daed49b6896095b805551096a1a7e1573198ce93c32a2fb41b
+    receptor_segments: [P0]
+    expected_residue_ranges: [[36, 338]]
+  endpoints: {inactive: 4N6H, active: 6PT3}
+  analysis_keep_range: [36, 338]
+  icl3_range: [235, 259]
+  ionic_lock:
+    res_pos: 146
+    res_pos_name: ARG
+    res_neg: 260
+    res_neg_name: THR
+    pos_atoms: [NH1, NH2, NE]
+    neg_atoms: [OG1]
+  npxxy: {resid: 318, resname: TYR}
+  contact_label: "TM3-TM6 R146-T260 polar contact (Å; not a salt bridge)"

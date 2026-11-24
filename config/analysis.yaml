@@ -1,0 +1,62 @@
+# Analysis settings used for the paper. Change them only on purpose:
+# each run records a hash of this file in its provenance.
+
+md:
+  frame_dt_ps: 200.0          # GPCRmd "Delta" = 0.2 ns. Raw XTC headers store 1000x this.
+  # Unequal replicates are trimmed to the shortest so each replicate has equal weight
+  # (CHRM2 replicate 3 has 2,250 frames, so all three CHRM2 replicates use 2,250).
+  replica_policy: trim_to_shortest
+  stride: 1
+
+cartesian:
+  # Frames discarded from the start of every replicate before the Cartesian
+  # analyses (PCA/RMSIP, RMSF, ANM, states, descriptors). 25 ns = 125 frames.
+  # Applied identically to all five receptors.
+  skip_ns: 25.0
+  min_common_residues: 60
+
+dpca:
+  # dPCA uses every stored frame (no skip, no stride).
+  skip_ns: 0.0
+  n_components: 5
+  histogram_bins: 8           # 8 x 8 bins at MD quantiles of dPC1/dPC2
+  pseudocount: 0.1            # added to every bin of both histograms
+  window_frames: 100          # 20-ns contiguous MD windows (100 x 0.2 ns)
+  random_draws: 1000
+  seed: 2026
+  peptide_bond_min_A: 0.9     # C(i-1)-N(i) distance accepted as an intact bond
+  peptide_bond_max_A: 2.2
+  min_torsions: 60
+
+af2:
+  colabfold_version: "1.6.1"  # paper runs used the ghcr.io/sokrypton/colabfold:1.6.1-cuda12 image
+  model_type: alphafold2_ptm
+  num_models: 5
+  num_recycle: 3
+  use_dropout: true
+  use_templates: false
+  seeds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+  # label: [max_seq, max_extra_seq]  (ColabFold --max-msa max_seq:max_extra_seq)
+  depths:
+    "512:5120": [512, 5120]
+    "256:2560": [256, 2560]
+    "128:1280": [128, 1280]
+    "64:640": [64, 640]
+    "32:320": [32, 320]
+    "16:160": [16, 160]
+    "8:80": [8, 80]
+    "1:2": [1, 2]
+  models_per_depth: 100       # 20 seeds x 5 models
+
+states:
+  # Nearest-MD reference: each MD frame's nearest other frame, excluding frames within
+  # this window in the same replicate. AF2 models query every retained MD frame.
+  nearest_md_exclusion_ns: 25.0
+
+bootstrap:
+  # Paired seed-group / MD-block bootstrap of the Cartesian depth contrasts.
+  reference: "32:320"
+  comparators: ["512:5120", "64:640", "16:160"]
+  block_ns: [25, 50]          # MD blocks resampled within each replicate; seed-only scheme uses the first
+  draws: 500
+  seed_root: 20261124
