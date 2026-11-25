@@ -40,6 +40,9 @@ gpcr-af2md = "gpcr_af2md.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"gpcr_af2md.plotting" = ["*.mplstyle"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
