@@ -104,7 +104,7 @@ Stages can also be run one at a time: `fetch`, `prepare`, `cartesian`, `dpca`, `
 
 ## Citation
 
-Please cite the preprint (see `CITATION.cff`) and GPCRmd. If you use the AF2 ensembles, also cite ColabFold (Mirdita *et al.*, *Nat Methods* 19, 679-682, 2022) and AlphaFold2 (Jumper *et al.*, *Nature* 596, 583-589, 2021).
+Please cite the preprint (see `CITATION.cff`) and GPCRmd. The AF2 alignments and predicted models are on Zenodo ([doi:10.5281/zenodo.24592084](https://doi.org/10.5281/zenodo.24592084)). If you use the AF2 ensembles, also cite ColabFold (Mirdita *et al.*, *Nat Methods* 19, 679-682, 2022) and AlphaFold2 (Jumper *et al.*, *Nature* 596, 583-589, 2021).
 
 ## License
 
