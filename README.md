@@ -112,4 +112,4 @@ Code: MIT (see `LICENSE`). Experimental structures in `data/endpoints/` derive f
 
 ## Contact
 
-Joyita F., Computational Molecular Biology Group, Chulalongkorn University. Open an issue for questions or problems.
+Joyita F., Computational Molecular Biology Group, Chulalongkorn University. Open an issue for questions or problems. 
